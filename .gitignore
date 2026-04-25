@@ -1,0 +1,23 @@
+# Virtual env
+snapclass/
+venv/
+env/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+.streamlit/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Unnecessary
+get-pip.py

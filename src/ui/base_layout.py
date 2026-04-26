@@ -157,6 +157,29 @@ def style_base_layout():
             div[data-testid="stAlert"] p {
                 color: #92400E !important;   
                 font-weight: 600 !important;
-            }     
+            } 
+
+
+            div[data-testid="stMetric"] {
+            background-color: #BBF7D0 !important;
+            border-radius: 1rem !important;
+            padding: 1rem !important;
+            }
+
+            div[data-testid="stMetric"] label {
+                color: #065F46 !important;
+                font-weight: 600 !important;
+            }
+
+            div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+                color: #052E1C !important;
+                font-size: 2rem !important;
+            }  
+                  
+            hr {
+            border-color: rgba(255, 255, 255, 0.3) !important;
+            box-shadow: 0 0 6px rgba(0,255,200,0.4), 0 0 12px rgba(0,255,200,0.2) !important;
+            }
+            
                 
         </style>""",unsafe_allow_html=True)

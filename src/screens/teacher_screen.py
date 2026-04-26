@@ -5,7 +5,7 @@ from src.ui.base_layout import style_background_dashboard, style_base_layout
 from src.components.header import header_dashboard
 from src.components.footer import footer_dashboard
 from src.components.subject_card import subject_card
-from src.database.db import check_teacher_exists, create_teacher, teacher_login, get_teacher_subjects, get_attendance_for_teacher
+from src.database.db import check_teacher_exists, create_teacher, teacher_login, get_teacher_subjects, get_attendance_for_teacher, get_attendance_with_students, update_attendance
 from src.components.dialog_create_subject import create_subject_dialog
 from src.components.dialog_share_subject import share_subject_dialog
 from src.components.dialog_add_photo import add_photos_dialog
@@ -127,6 +127,15 @@ def teacher_tab_take_attendance():
     col1, col2 = st.columns([3,1], vertical_alignment='bottom')
 
     with col1:
+        st.markdown("""
+        <style>
+        div[data-testid="stSelectbox"] label,
+        div[data-testid="stSelectbox"] p {
+            color: white !important;
+            font-weight: 600;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         selected_subject_label = st.selectbox('Select Subject', options=list(subject_options.keys()))
 
     with col2:
@@ -190,7 +199,7 @@ def teacher_tab_take_attendance():
                         results.append({
                             "Name": student['name'],
                             "ID": student['student_id'],
-                            "Source": ", ".join(sources) if is_present else "-",
+                            "Source": ", ".join(sources) if is_present else None,
                             "Status": "✅ Present" if is_present else "❌ Absent"
                         })
 
@@ -253,52 +262,165 @@ def teacher_tab_manage_subjects():
 
 
 def teacher_tab_attendance_records():
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Michroma&display=swap');
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Michroma', sans-serif !important;
+        color: white !important;
+    }
+    .michroma-text {
+        font-family: 'Michroma', sans-serif !important;
+        color: white !important;
+        font-size: 18px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     st.header('Attendance Records')
 
     teacher_id = st.session_state.teacher_data['teacher_id']
 
-    records = get_attendance_for_teacher(teacher_id)
+    records = get_attendance_with_students(teacher_id)
 
     if not records:
+        st.info('No attendance records yet.')
         return
-    
-    data = []
 
+    data = []
     for r in records:
         ts = r.get('timestamp')
-
         data.append({
-            "ts_group": ts.split(".")[0] if ts else None,
-            "Time": datetime.fromisoformat(ts).strftime("%Y-%m-%d %I:%M %p") if ts else "N'A",
-            "Subject": r['subjects']['name'],
-            "Subject Code":r['subjects']['subject_code'],
-            "is_present": bool(r.get('is_present', False))
+            "log_id":       r['id'],
+            "ts_group":     ts.split(".")[0] if ts else None,
+            "Time":         datetime.fromisoformat(ts).strftime("%Y-%m-%d %I:%M %p") if ts else "N/A",
+            "Subject":      r['subjects']['name'],
+            "Subject Code": r['subjects']['subject_code'],
+            "Student":      r['students']['name'] if r.get('students') else "Unknown",
+            "is_present":   bool(r.get('is_present', False))
         })
-
 
     df = pd.DataFrame(data)
 
+    total_sessions  = df['ts_group'].nunique()
+    total_students  = df['Student'].nunique()
+    avg_attendance  = round(df['is_present'].mean() * 100)
 
+    m1, m2, m3 = st.columns(3)
+    m1.metric('Total Sessions', total_sessions)
+    m2.metric('Total Students', total_students)
+    m3.metric('Avg Attendance', f'{avg_attendance}%')
+
+    st.divider()
+
+    subjects = ['All'] + sorted(df['Subject'].unique().tolist())
+    selected = st.selectbox('Filter by Subject', subjects)
+
+    if selected != 'All':
+        df = df[df['Subject'] == selected]
 
     summary = (
         df.groupby(['ts_group', 'Time', 'Subject', 'Subject Code'])
         .agg(
-            Present_Count = ('is_present', 'sum'),
-            Total_Count =('is_present', 'count')
+            Present_Count=('is_present', 'sum'),
+            Total_Count=('is_present', 'count')
         ).reset_index()
-
     )
-
     summary['Attendance Stats'] = (
-        "✅ " + summary['Present_Count'].astype(str) + " /"
+        "✅ " + summary['Present_Count'].astype(str) + " / "
         + summary['Total_Count'].astype(str) + ' Students'
     )
-
-    display_df = ( summary.sort_values(by='ts_group' ,ascending=False)
-                  [['Time', 'Subject', 'Subject Code', 'Attendance Stats']]
-                  )
-    
+    display_df = summary.sort_values(by='ts_group', ascending=False)[
+        ['Time', 'Subject', 'Subject Code', 'Attendance Stats']
+    ]
     st.dataframe(display_df, width='stretch', hide_index=True)
+
+    st.divider()
+
+    st.markdown("<h2>Student Attendance  %</h2>", unsafe_allow_html=True)
+
+    student_stats = (
+        df.groupby('Student')['is_present']
+        .agg(attended='sum', total='count')
+        .reset_index()
+    )
+    student_stats['pct'] = (student_stats['attended'] / student_stats['total'] * 100).round(1)
+    student_stats['Status'] = student_stats['pct'].apply(lambda x: '🔴 Low' if x < 75 else '🟢 Good')
+    student_stats['Attendance %'] = student_stats['pct'].astype(str) + '%'
+
+    st.dataframe(
+        student_stats[['Student', 'attended', 'total', 'Attendance %', 'Status']].rename(columns={
+            'attended': 'Present', 'total': 'Total Classes'
+        }),
+        width='stretch', hide_index=True
+    )
+
+    defaulters = student_stats[student_stats['pct'] < 75]
+    if not defaulters.empty:
+        st.warning(f"⚠️ {len(defaulters)} student(s) below 75%: " +
+                   ", ".join(defaulters['Student'].tolist()))
+
+    st.download_button(
+        label='Download Report as CSV',
+        data=display_df.to_csv(index=False),
+        file_name='attendance_report.csv',
+        mime='text/csv'
+    )
+
+    st.divider()
+    
+    with st.container(border=True):
+
+        st.markdown("""
+        <style>
+        .white-text {
+            color: white !important;
+            font-weight: 600;
+            font-size: 18px !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<h2>Correct Attendance</h2>', unsafe_allow_html=True)
+
+        st.markdown('<p class="michroma-text" style="font-size:16px;">Select a session and fix any wrong AI marks below.</p>',unsafe_allow_html=True)
+
+        session_options = display_df['Time'].tolist()
+        st.markdown("""
+        <style>
+        div[data-testid="stSelectbox"] label {
+            color: white !important;
+            font-weight: 600;
+        }
+
+        div[data-testid="stSelectbox"] div[data-baseweb="select"] {
+            color: black !important;   /* keep dropdown readable */
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        selected_session = st.selectbox('Select Session', session_options, key='correction_session')
+
+        if selected_session:
+            selected_ts = summary[summary['Time'] == selected_session]['ts_group'].values[0]
+            session_df = df[df['ts_group'] == selected_ts].copy()
+
+            for _, row in session_df.iterrows():
+                c1, c2, c3 = st.columns([3, 2, 2])
+                with c1:
+                    st.markdown(
+                        f"<p style='color:white; font-weight:600;'>{row['Student']}</p>",
+                        unsafe_allow_html=True)
+
+                with c2:
+                    status = '✅ Present' if row['is_present'] else '❌ Absent'
+                    st.markdown(
+                        f"<p style='color:white; font-weight:600;'>{status}</p>",
+                        unsafe_allow_html=True)
+                with c3:
+                    btn_label = 'Mark Absent' if row['is_present'] else 'Mark Present'
+                    if st.button(btn_label, key=f"fix_{row['log_id']}"):
+                        update_attendance(row['log_id'], not row['is_present'])
+                        st.toast(f"Updated {row['Student']} → {'Absent' if row['is_present'] else 'Present'}")
+                        st.rerun()
 
 
 def login_teacher(username, password):

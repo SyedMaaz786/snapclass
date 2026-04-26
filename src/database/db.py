@@ -95,3 +95,11 @@ def create_attendance(logs):
 def get_attendance_for_teacher(teacher_id):
     response = supabase.table('attendance_logs').select("*, subjects!inner(*)").eq('subjects.teacher_id', teacher_id).execute()
     return response.data
+
+def get_attendance_with_students(teacher_id):
+    response = supabase.table('attendance_logs').select("*, subjects!inner(*), students(name)").eq('subjects.teacher_id', teacher_id).execute()
+    return response.data
+
+def update_attendance(log_id, is_present):
+    response = supabase.table('attendance_logs').update({'is_present': is_present}).eq('id', log_id).execute()
+    return response.data

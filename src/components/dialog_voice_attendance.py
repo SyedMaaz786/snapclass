@@ -27,8 +27,8 @@ def voice_attendance_dialog(selected_subject_id):
                 st.warning('No students enrolled in this course')
                 return
             candidates_dict = {
-                s['students']['student_id'] : s['students']['voice_embedding'] 
-                for s in enrolled_students if s['students'].get('voice_embedding')
+                s['students']['student_id'] : s['students']['voice_embeddings'] 
+                for s in enrolled_students if s['students'].get('voice_embeddings')
             }
 
             if not candidates_dict:

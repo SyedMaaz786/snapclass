@@ -109,6 +109,13 @@ h2 {{
     footer_dashboard()
 
 def teacher_tab_take_attendance():
+    st.markdown("""
+    <style>
+    div[data-testid="stSpinner"] p {
+        color: #000000 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     teacher_id = st.session_state.teacher_data['teacher_id']
     st.header('Take AI Attendance')
 

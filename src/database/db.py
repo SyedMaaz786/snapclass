@@ -17,19 +17,51 @@ def check_teacher_exists(username):
 
 
 
-def create_teacher(username, password, name):
+import uuid
+def create_teacher(email, username, password, name):
 
-    data = { "username" : username, "password": hash_pass(password), "name": name}
+    # 1. create Supabase auth user
+    user = supabase.auth.sign_up({
+        "email": email,
+        "password": password
+    })
+
+    if user.user is None:
+        return None
+
+    # 2. insert into teachers table
+    data = {
+        "username": username,
+        "name": name,
+        "user_id": user.user.id   
+    }
+
     response = supabase.table("teachers").insert(data).execute()
     return response.data
 
 
-def teacher_login(username, password):
-    response = supabase.table("teachers").select("*").eq("username", username).execute()
+def teacher_login(email, password):
+
+    user = supabase.auth.sign_in_with_password({
+        "email": email,
+        "password": password
+    })
+
+    if user.session is None:
+        return None
+
+    # attach JWT
+    supabase.postgrest.auth(user.session.access_token)
+
+    # get ONLY this user's teacher row
+    response = supabase.table("teachers") \
+        .select("*") \
+        .eq("user_id", user.user.id) \
+        .execute()
+
     if response.data:
-        teacher = response.data[0]
-        if check_pass(password, teacher['password']):
-            return teacher
+        return response.data[0]
+
     return None
 
 

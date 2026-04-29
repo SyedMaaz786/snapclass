@@ -423,20 +423,21 @@ def teacher_tab_attendance_records():
                         st.rerun()
 
 
-def login_teacher(username, password):
-    if not username or not password:
+def login_teacher(email, password):
+    if not email or not password:
         return False
-    
-    teacher = teacher_login(username, password)
+
+    teacher = teacher_login(email, password)
 
     if teacher:
-        st.session_state.user_role ='teacher'
+        st.session_state.user_role = 'teacher'
         st.session_state.teacher_data = teacher
         st.session_state.is_logged_in = True
         return True
-    
 
     return False
+
+
 def teacher_screen_login():
     c1, c2 = st.columns(2, vertical_alignment='center', gap='xxlarge')
     with c1:
@@ -451,7 +452,7 @@ def teacher_screen_login():
     st.space()
 
 
-    teacher_username = st.text_input("Enter username", placeholder='e.g. john.doe')
+    teacher_email = st.text_input("Enter email", placeholder="e.g. johndoe@gmail.com")
 
     teacher_pass = st.text_input("Enter password", type='password', placeholder="Enter password")
 
@@ -461,7 +462,7 @@ def teacher_screen_login():
 
     with btnc1:
         if st.button('Login', icon=':material/passkey:', shortcut='control+enter', width='stretch'):
-            if login_teacher(teacher_username, teacher_pass):
+            if login_teacher(teacher_email, teacher_pass):
                 st.toast("welcome back!", icon="👋")
                 import time
                 time.sleep(1)
@@ -477,19 +478,22 @@ def teacher_screen_login():
 
 
 
-def register_teacher(teacher_username, teacher_name, teacher_pass, teacher_pass_confirm):
-    if not teacher_username or not teacher_name or not teacher_pass:
+def register_teacher(email, teacher_username, teacher_name, teacher_pass, teacher_pass_confirm):
+
+    if not email or not teacher_username or not teacher_name or not teacher_pass:
         return False, "All Fields are required!"
+
     if check_teacher_exists(teacher_username):
         return False, "Username already taken"
+
     if teacher_pass != teacher_pass_confirm:
         return False, "Password doesn't match"
-    
+
     try:
-        create_teacher(teacher_username, teacher_pass, teacher_name)
-        return True, "Sucessfully Created! Login Now"
+        create_teacher(email, teacher_username, teacher_pass, teacher_name)
+        return True, "Successfully Created! Login Now"
     except Exception as e:
-        return False, "Unexpected Error!"
+        return False, str(e)
     
 
 def teacher_screen_register():
@@ -508,6 +512,7 @@ def teacher_screen_register():
     st.space()
     st.space()
 
+    teacher_email = st.text_input("Enter email", placeholder="e.g. johndoe@gmail.com")
     
     teacher_username = st.text_input("Enter username", placeholder='e.g. john.doe')
 
@@ -523,7 +528,7 @@ def teacher_screen_register():
 
     with btnc1:
         if st.button('Register now', icon=':material/passkey:', shortcut='control+enter', width='stretch'):
-            success, message = register_teacher(teacher_username, teacher_name, teacher_pass, teacher_pass_confirm)
+            success, message = register_teacher(teacher_email, teacher_username, teacher_name, teacher_pass, teacher_pass_confirm)
             if success:
                 st.success(message)
                 import time

@@ -33,7 +33,8 @@ def create_teacher(email, username, password, name):
     data = {
         "username": username,
         "name": name,
-        "user_id": user.user.id   
+        "user_id": user.user.id,
+        "email": email
     }
 
     response = supabase.table("teachers").insert(data).execute()
